@@ -103,5 +103,47 @@ def launch_tui(firmware: str, rootfs: str):
 
     run_tui(rootfs_path=root_dir, firmware_path=Path(firmware) if firmware else None)
 
+@main.command("audit")
+@click.argument("firmware_path", type=click.Path(exists=True))
+@click.option("--output", "-o", default="firmware_audit_report.md", help="Output path for Markdown report")
+@click.option("--json-output", "-j", default=None, help="Optional output path for JSON report")
+def audit_firmware(firmware_path: str, output: str, json_output: Optional[str]):
+    """Runs a complete static and dynamic audit, generating a security report."""
+    from firmsight.analysis.reporter import SecurityReporter
+    fw_path = Path(firmware_path)
+    console.print(f"[bold cyan]Auditing firmware:[/] {fw_path}")
+
+    # 1. Extraction
+    extractor = ExtractorEngine(output_dir=Path("audit_rootfs"))
+    extraction_report = extractor.extract(fw_path)
+
+    # 2. Architecture Detection
+    rootfs = Path(extraction_report["rootfs_path"])
+    arch_info = ArchDetector.scan_rootfs(rootfs) or {}
+
+    # 3. Compile Report
+    reporter = SecurityReporter(target_name=fw_path.name)
+    reporter.set_extraction_results(extraction_report)
+    reporter.set_arch_results(arch_info)
+
+    md_path = Path(output)
+    reporter.generate_markdown(md_path)
+    console.print(f"[bold green]✓ Markdown report generated:[/] {md_path}")
+
+    if json_output:
+        j_path = Path(json_output)
+        reporter.generate_json(j_path)
+        console.print(f"[bold green]✓ JSON report generated:[/] {j_path}")
+
+@main.command("mock-nvram")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+def mock_nvram(rootfs_path: str):
+    """Initializes virtual NVRAM key-value tables inside the rootfs."""
+    from firmsight.core.nvram import NVRAMMock
+    nv = NVRAMMock(Path(rootfs_path))
+    created = nv.initialize_mock()
+    console.print(f"[bold green]✓ Initialized NVRAM mock table at:[/] {created}")
+
 if __name__ == "__main__":
     main()
+
