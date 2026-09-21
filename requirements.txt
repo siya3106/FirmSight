@@ -1,0 +1,9 @@
+textual>=0.40.0
+rich>=13.0.0
+click>=8.1.0
+pydantic>=2.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+# Optional / Advanced dynamic tracing and packet capture:
+# r2pipe>=1.9.0
+# scapy>=2.5.0
