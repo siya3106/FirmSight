@@ -8,11 +8,14 @@
 
 - **Automated Extraction Engine**: Seamlessly uncarves root filesystems (SquashFS, CramFS, JFFS2, tarballs) using Binwalk and signature-fallback extractors.
 - **Cross-Architecture Detection**: Direct ELF header parser identifying CPU architectures (ARM, AArch64, MIPS-EB, MIPS-EL, x86, RISC-V) and matching appropriate QEMU static emulators.
+- **NVRAM Virtualization**: Prepopulates and mocks NVRAM tables (`nvram.json`) to prevent router web daemons (`httpd`, `boa`, `uhttpd`) from failing on missing parameters.
 - **QEMU Emulation Supervisor**: Supports user-mode `chroot` emulation (`qemu-arm-static`, `qemu-mipseb-static`) and full-system virtualization harnesses.
 - **Network Isolation & Telemetry**: Sandboxes emulated instances into isolated virtual network namespaces (`tap0` / bridge) with integrated PCAP flow logging.
 - **Behavioral & C2 Heuristics**: Analyzes DNS lookups, outbound socket attempts, and potential botnet signatures (e.g. Mirai/Gafgyt sweeps) in real time.
-- **Dynamic Memory Tracing**: Connects to running processes via `r2pipe` / Radare2 to audit memory maps and execution states.
-- **Interactive Terminal UI (TUI)**: Powered by Textual with multi-pane navigation for Filesystem inspection, Emulation logs, and Network telemetry.
+- **Dynamic Memory Tracing & Crash Monitor**: Connects to running processes via `r2pipe` / Radare2 to audit memory maps, while diagnosing abnormal termination signals (SIGSEGV, SIGBUS, SIGABRT) and fault registers.
+- **Static Vulnerability Scanner**: Automatically scans root filesystems for hardcoded private keys (`.pem`, `.key`, `id_rsa`), cleartext credentials, and SUID binaries.
+- **Automated Multi-Format Reporting**: Generates comprehensive audit reports in **Markdown**, **JSON**, and responsive single-file **HTML Dashboards** with CWE mappings (CWE-798, CWE-258, CWE-319, CWE-119).
+- **Interactive Terminal UI (TUI)**: Powered by Textual with multi-pane navigation for Filesystem inspection, Emulation logs, Network telemetry, and Memory mapping.
 
 ---
 
@@ -20,6 +23,9 @@
 
 ```text
 firmsight/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # Cross-platform matrix CI workflow
 ├── pyproject.toml
 ├── requirements.txt
 ├── README.md
@@ -31,12 +37,17 @@ firmsight/
 │   │   ├── detector.py            # Architecture & ELF parser
 │   │   ├── extractor.py           # Binwalk & archive extraction engine
 │   │   ├── emulator.py            # QEMU environment supervisor
+│   │   ├── nvram.py               # NVRAM key-value virtualizer
 │   │   ├── network.py             # TUN/TAP network isolation
 │   │   └── tracer.py              # r2pipe / GDB dynamic memory tracer
 │   ├── analysis/
 │   │   ├── __init__.py
 │   │   ├── pcap_analyzer.py       # Live packet streaming
-│   │   └── heuristics.py          # Behavioral anomaly & C2 heuristic engine
+│   │   ├── heuristics.py          # Behavioral anomaly & C2 heuristic engine
+│   │   ├── crash_monitor.py       # Signal fault & crash register decoder
+│   │   ├── static_scanner.py      # Secret, key, and backdoor scanner
+│   │   ├── reporter.py            # Markdown & JSON audit report generator
+│   │   └── html_reporter.py       # Interactive HTML dashboard generator
 │   ├── ui/
 │   │   ├── __init__.py
 │   │   ├── app.py                 # Textual application main class
@@ -56,7 +67,12 @@ firmsight/
 └── tests/
     ├── test_detector.py
     ├── test_extractor.py
-    └── test_heuristics.py
+    ├── test_heuristics.py
+    ├── test_nvram.py
+    ├── test_reporter.py
+    ├── test_crash_monitor.py
+    ├── test_static_scanner.py
+    └── test_html_reporter.py
 ```
 
 ---
@@ -88,7 +104,18 @@ firmsight extract router_firmware.bin --output extracted_rootfs/
 firmsight detect extracted_rootfs/
 ```
 
-### 5. Launch the Interactive Terminal UI (TUI)
+### 5. Static Vulnerability & Secret Scan
+```bash
+firmsight scan extracted_rootfs/
+```
+
+### 6. Automated Audit & Report Generation
+Run extraction, architecture detection, secret scanning, and generate a comprehensive HTML/Markdown report:
+```bash
+firmsight audit router_firmware.bin --output report.md --json-output report.json --html-output report.html
+```
+
+### 7. Launch the Interactive Terminal UI (TUI)
 ```bash
 firmsight tui --firmware router_firmware.bin
 # Or open directly on an already-extracted rootfs:

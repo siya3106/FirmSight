@@ -107,9 +107,11 @@ def launch_tui(firmware: str, rootfs: str):
 @click.argument("firmware_path", type=click.Path(exists=True))
 @click.option("--output", "-o", default="firmware_audit_report.md", help="Output path for Markdown report")
 @click.option("--json-output", "-j", default=None, help="Optional output path for JSON report")
-def audit_firmware(firmware_path: str, output: str, json_output: Optional[str]):
+@click.option("--html-output", "-h", default=None, help="Optional output path for interactive HTML report")
+def audit_firmware(firmware_path: str, output: str, json_output: Optional[str], html_output: Optional[str]):
     """Runs a complete static and dynamic audit, generating a security report."""
     from firmsight.analysis.reporter import SecurityReporter
+    from firmsight.analysis.static_scanner import StaticScanner
     fw_path = Path(firmware_path)
     console.print(f"[bold cyan]Auditing firmware:[/] {fw_path}")
 
@@ -121,10 +123,15 @@ def audit_firmware(firmware_path: str, output: str, json_output: Optional[str]):
     rootfs = Path(extraction_report["rootfs_path"])
     arch_info = ArchDetector.scan_rootfs(rootfs) or {}
 
-    # 3. Compile Report
+    # 3. Static Vulnerability Scan
+    scanner = StaticScanner(rootfs)
+    static_report = scanner.scan()
+
+    # 4. Compile Report
     reporter = SecurityReporter(target_name=fw_path.name)
     reporter.set_extraction_results(extraction_report)
     reporter.set_arch_results(arch_info)
+    reporter.set_static_findings(static_report)
 
     md_path = Path(output)
     reporter.generate_markdown(md_path)
@@ -134,6 +141,39 @@ def audit_firmware(firmware_path: str, output: str, json_output: Optional[str]):
         j_path = Path(json_output)
         reporter.generate_json(j_path)
         console.print(f"[bold green]✓ JSON report generated:[/] {j_path}")
+
+    if html_output:
+        h_path = Path(html_output)
+        reporter.generate_html(h_path)
+        console.print(f"[bold green]✓ Interactive HTML report generated:[/] {h_path}")
+
+@main.command("scan")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+def scan_rootfs(rootfs_path: str):
+    """Scans an extracted root filesystem for hardcoded secrets, backdoors, and keys."""
+    from firmsight.analysis.static_scanner import StaticScanner
+    p = Path(rootfs_path)
+    console.print(f"[bold cyan]Scanning filesystem for vulnerabilities:[/] {p}")
+    scanner = StaticScanner(p)
+    results = scanner.scan()
+    findings = results["findings"]
+
+    if not findings:
+        console.print("[bold green]✓ No static vulnerabilities or secrets identified.[/]")
+        return
+
+    table = Table(title=f"Static Vulnerability Findings ({len(findings)} total)", style="yellow")
+    table.add_column("Severity", style="bold")
+    table.add_column("CWE", style="cyan")
+    table.add_column("Path", style="white")
+    table.add_column("Description", style="yellow")
+
+    for f in findings:
+        sev = f.get("severity", "LOW")
+        sev_colored = f"[red]{sev}[/]" if sev in ("CRITICAL", "HIGH") else f"[yellow]{sev}[/]"
+        table.add_row(sev_colored, f.get("cwe", "N/A"), f.get("path", ""), f.get("description", ""))
+
+    console.print(table)
 
 @main.command("mock-nvram")
 @click.argument("rootfs_path", type=click.Path(exists=True))
@@ -146,4 +186,5 @@ def mock_nvram(rootfs_path: str):
 
 if __name__ == "__main__":
     main()
+
 
