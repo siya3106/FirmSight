@@ -184,7 +184,41 @@ def mock_nvram(rootfs_path: str):
     created = nv.initialize_mock()
     console.print(f"[bold green]✓ Initialized NVRAM mock table at:[/] {created}")
 
+@main.command("entropy")
+@click.argument("binary_path", type=click.Path(exists=True))
+@click.option("--block-size", "-b", default=1024, help="Sliding window block size in bytes")
+def analyze_entropy(binary_path: str, block_size: int):
+    """Calculates sliding-window Shannon entropy to identify compressed or encrypted firmware regions."""
+    from firmsight.analysis.entropy import EntropyAnalyzer
+    p = Path(binary_path)
+    console.print(f"[bold cyan]Analyzing Shannon entropy for:[/] {p}")
+
+    analyzer = EntropyAnalyzer(block_size=block_size)
+    res = analyzer.analyze_file(p)
+
+    console.print(f"Overall Entropy: [bold yellow]{res['overall_entropy']}[/] / 8.0 ([bold]{res['overall_classification']}[/])")
+    console.print(f"Total Bytes: [bold]{res['total_bytes']}[/] | Sliding Samples: [bold]{res['curve_samples']}[/]\n")
+
+    table = Table(title="Detected Entropy Regions", style="cyan")
+    table.add_column("Start Offset", style="bold white")
+    table.add_column("End Offset", style="bold white")
+    table.add_column("Length", style="cyan")
+    table.add_column("Avg Entropy", style="yellow")
+    table.add_column("Classification", style="magenta")
+
+    for r in res["regions"]:
+        table.add_row(
+            r["start_offset"],
+            r["end_offset"],
+            f"{r['length']} B",
+            str(r["avg_entropy"]),
+            r["classification"],
+        )
+
+    console.print(table)
+
 if __name__ == "__main__":
     main()
+
 
 

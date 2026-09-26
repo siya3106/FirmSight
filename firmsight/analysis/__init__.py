@@ -1,5 +1,5 @@
 """
-FirmSight Analysis: Heuristics, Network Traffic Analytics, Reporting, and Static Scanning
+FirmSight Analysis: Heuristics, Network Traffic Analytics, Reporting, Static Scanning, and Entropy
 """
 
 from .heuristics import TrafficHeuristicsEngine
@@ -8,6 +8,7 @@ from .reporter import SecurityReporter
 from .crash_monitor import CrashMonitor
 from .static_scanner import StaticScanner
 from .html_reporter import HTMLReporter
+from .entropy import EntropyAnalyzer
 
 __all__ = [
     "TrafficHeuristicsEngine",
@@ -16,4 +17,5 @@ __all__ = [
     "CrashMonitor",
     "StaticScanner",
     "HTMLReporter",
+    "EntropyAnalyzer",
 ]
