@@ -217,8 +217,47 @@ def analyze_entropy(binary_path: str, block_size: int):
 
     console.print(table)
 
+@main.command("check-deps")
+@click.argument("target_path", type=click.Path(exists=True))
+def check_dependencies(target_path: str):
+    """Scans an ELF binary or extracted rootfs to verify shared library (.so) dependencies."""
+    from firmsight.core.dep_scanner import DependencyScanner
+    p = Path(target_path)
+
+    if p.is_file():
+        scanner = DependencyScanner(rootfs_path=p.parent)
+        res = scanner.inspect_binary(p)
+        if not res.get("is_elf"):
+            console.print("[bold red]Not a valid ELF binary.[/]")
+            return
+
+        console.print(f"[bold cyan]Binary:[/] {p.name} ({res.get('bitness')}-bit, {res.get('endianness')})")
+        console.print(f"Needed Libraries: [yellow]{', '.join(res.get('needed_libraries', [])) or 'None (Statically Linked)'}[/]")
+        if res.get("missing_libraries"):
+            console.print(f"[bold red]Missing Dependencies:[/] {', '.join(res['missing_libraries'])}")
+        else:
+            console.print("[bold green]✓ All dependencies satisfied or statically linked.[/]")
+    else:
+        scanner = DependencyScanner(rootfs_path=p)
+        res = scanner.scan_rootfs()
+        console.print(f"[bold cyan]Auditing dependencies for rootfs at:[/] {p}")
+        console.print(f"Binaries Audited: [bold]{res['binaries_count']}[/] | Total Missing: [bold red]{res['total_missing_dependencies']}[/]")
+
+        table = Table(title="Shared Library Dependency Health", style="yellow")
+        table.add_column("Binary", style="cyan")
+        table.add_column("Needed (.so)", style="white")
+        table.add_column("Missing (.so)", style="bold red")
+
+        for b in res["binaries"]:
+            needed_str = ", ".join(b.get("needed_libraries", [])) or "Static"
+            missing_str = ", ".join(b.get("missing_libraries", [])) or "None"
+            table.add_row(Path(b["file"]).name, needed_str, missing_str)
+
+        console.print(table)
+
 if __name__ == "__main__":
     main()
+
 
 
 
