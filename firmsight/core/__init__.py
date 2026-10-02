@@ -1,5 +1,5 @@
 """
-FirmSight Core Modules: Architecture Detection, Extraction, Emulation, Network, Dynamic Tracing, NVRAM, and Dependency Scanning.
+FirmSight Core Modules: Architecture Detection, Extraction, Emulation, Network, Dynamic Tracing, NVRAM, Dependency Scanning, and Header Parsing.
 """
 
 from .detector import ArchDetector
@@ -9,6 +9,7 @@ from .network import NetworkManager
 from .tracer import DynamicTracer
 from .nvram import NVRAMMock
 from .dep_scanner import DependencyScanner
+from .header_parser import HeaderParser
 
 __all__ = [
     "ArchDetector",
@@ -18,4 +19,5 @@ __all__ = [
     "DynamicTracer",
     "NVRAMMock",
     "DependencyScanner",
+    "HeaderParser",
 ]

@@ -255,8 +255,36 @@ def check_dependencies(target_path: str):
 
         console.print(table)
 
+@main.command("header")
+@click.argument("firmware_path", type=click.Path(exists=True))
+def inspect_headers(firmware_path: str):
+    """Parses U-Boot (uImage) and Broadcom (TRX) firmware container headers."""
+    from firmsight.core.header_parser import HeaderParser
+    p = Path(firmware_path)
+    console.print(f"[bold cyan]Scanning firmware container headers for:[/] {p}")
+
+    headers = HeaderParser.parse_file(p)
+    if not headers:
+        console.print("[bold yellow]No recognized container headers (uImage/TRX) found.[/]")
+        return
+
+    for h in headers:
+        table = Table(title=f"Container Header: {h['format']} @ {h['hex_offset']}", style="green")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="bold white")
+
+        for k, v in h.items():
+            if k == "partition_offsets":
+                sub_str = ", ".join([f"{part['partition']}: {part['offset']}" for part in v])
+                table.add_row("Partitions", sub_str)
+            else:
+                table.add_row(k.replace("_", " ").title(), str(v))
+
+        console.print(table)
+
 if __name__ == "__main__":
     main()
+
 
 
 
