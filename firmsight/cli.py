@@ -177,12 +177,44 @@ def scan_rootfs(rootfs_path: str):
 
 @main.command("mock-nvram")
 @click.argument("rootfs_path", type=click.Path(exists=True))
-def mock_nvram(rootfs_path: str):
-    """Initializes virtual NVRAM key-value tables inside the rootfs."""
+@click.option("--vendor", "-v", default="generic", type=click.Choice(["generic", "dlink", "netgear", "asus", "openwrt"]), help="Target router vendor profile")
+@click.option("--override", "-o", multiple=True, help="Custom NVRAM key-value override, e.g. -o lan_ipaddr=10.0.0.1")
+def mock_nvram(rootfs_path: str, vendor: str, override: List[str]):
+    """Initializes virtual NVRAM key-value tables and mock binary stubs inside the rootfs."""
+    from firmsight.core.nvram import NVRAMMock
+    custom = {}
+    for item in override:
+        if "=" in item:
+            k, v = item.split("=", 1)
+            custom[k.strip()] = v.strip()
+
+    nv = NVRAMMock(Path(rootfs_path))
+    created = nv.initialize_mock(vendor=vendor, custom_keys=custom)
+    console.print(f"[bold green]✓ Initialized {vendor.upper()} NVRAM mock table at:[/] {created}")
+    if custom:
+        console.print(f"Applied overrides: [cyan]{custom}[/]")
+
+@main.command("nvram-export")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+@click.option("--output", "-o", default="nvram_exported.json", help="Destination file path")
+@click.option("--format", "-f", "fmt", default="json", type=click.Choice(["json", "env"]), help="Export format")
+def nvram_export(rootfs_path: str, output: str, fmt: str):
+    """Exports NVRAM table from a rootfs to JSON or .env format."""
     from firmsight.core.nvram import NVRAMMock
     nv = NVRAMMock(Path(rootfs_path))
-    created = nv.initialize_mock()
-    console.print(f"[bold green]✓ Initialized NVRAM mock table at:[/] {created}")
+    dest = nv.export_data(Path(output), fmt=fmt)
+    console.print(f"[bold green]✓ Successfully exported NVRAM ({fmt.upper()}) to:[/] {dest}")
+
+@main.command("nvram-import")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+@click.argument("file_path", type=click.Path(exists=True))
+def nvram_import(rootfs_path: str, file_path: str):
+    """Imports and merges NVRAM key-values from a JSON or .env file."""
+    from firmsight.core.nvram import NVRAMMock
+    nv = NVRAMMock(Path(rootfs_path))
+    merged = nv.import_data(Path(file_path))
+    console.print(f"[bold green]✓ Imported {len(merged)} NVRAM keys from:[/] {file_path}")
+
 
 @main.command("entropy")
 @click.argument("binary_path", type=click.Path(exists=True))
