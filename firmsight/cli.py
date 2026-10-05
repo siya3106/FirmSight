@@ -314,8 +314,24 @@ def inspect_headers(firmware_path: str):
 
         console.print(table)
 
+@main.command("mock-sysfs")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+@click.option("--arch", "-a", default="ARM", type=click.Choice(["ARM", "AArch64", "MIPS", "x86"]), help="Target architecture hardware profile")
+def mock_sysfs(rootfs_path: str, arch: str):
+    """Provisions virtual /proc and /sys pseudo-devices for foreign CPU architectures."""
+    from firmsight.core.sysfs_mock import SysfsMock
+    p = Path(rootfs_path)
+    console.print(f"[bold cyan]Provisioning virtual sysfs & procfs ({arch}) in:[/] {p}")
+
+    mock = SysfsMock(p)
+    created = mock.provision_all(arch=arch)
+    console.print(f"[bold green]✓ Successfully provisioned {len(created)} virtual hardware interfaces.[/]")
+    for pseudo_path in created.keys():
+        console.print(f"  • [cyan]{pseudo_path}[/]")
+
 if __name__ == "__main__":
     main()
+
 
 
 
