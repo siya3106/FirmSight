@@ -103,7 +103,51 @@ def launch_tui(firmware: str, rootfs: str):
 
     run_tui(rootfs_path=root_dir, firmware_path=Path(firmware) if firmware else None)
 
+@main.command("emulate")
+@click.argument("rootfs_path", type=click.Path(exists=True))
+@click.option("--binary", "-b", default="/usr/sbin/uhttpd", help="Target daemon/binary inside rootfs")
+@click.option("--timeout", "-t", default=10, type=int, help="Watchdog timeout in seconds (0 for indefinite)")
+def emulate_daemon(rootfs_path: str, binary: str, timeout: int):
+    """Launches foreign CPU emulation under the async supervisor with watchdog timeout."""
+    import time
+    from firmsight.core.emulator import QEMUEmulator
+    from firmsight.core.detector import ArchDetector
+    p = Path(rootfs_path)
+    console.print(f"[bold cyan]Initializing emulation for rootfs at:[/] {p}")
+
+    arch_info = ArchDetector.scan_rootfs(p)
+    qemu_target = arch_info.get("qemu_target", "qemu-arm-static") if arch_info else "qemu-arm-static"
+    console.print(f"Target Emulator: [bold green]{qemu_target}[/] | Watchdog: [bold yellow]{timeout}s[/]")
+
+    emulator = QEMUEmulator(
+        rootfs_path=p,
+        qemu_binary=qemu_target,
+        timeout_seconds=timeout if timeout > 0 else None,
+        on_stdout=lambda line: console.print(f"[dim green]{line.strip()}[/]"),
+        on_stderr=lambda line: console.print(f"[bold yellow]{line.strip()}[/]"),
+        on_exit=lambda code: console.print(f"[bold magenta]Process exited with status code: {code}[/]"),
+    )
+
+    started = emulator.start_user_mode(target_binary=binary)
+    if not started:
+        console.print("[bold red]Failed to bootstrap emulator process.[/]")
+        return
+
+    console.print(f"[bold green]✓ Emulation supervisor active[/] (PID: {emulator.pid}). Running...")
+    try:
+        while emulator.is_running:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        console.print("\n[bold yellow]Stopping emulation gracefully...[/]")
+        emulator.stop()
+
+    if emulator.timed_out:
+        console.print("[bold red]⚠ Terminated by watchdog timeout.[/]")
+    else:
+        console.print("[bold green]✓ Emulation completed cleanly.[/]")
+
 @main.command("audit")
+
 @click.argument("firmware_path", type=click.Path(exists=True))
 @click.option("--output", "-o", default="firmware_audit_report.md", help="Output path for Markdown report")
 @click.option("--json-output", "-j", default=None, help="Optional output path for JSON report")
